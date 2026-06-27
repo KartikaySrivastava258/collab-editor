@@ -1,0 +1,52 @@
+version: '3.9'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Collab Editor — Full-Stack Docker Compose
+#
+# Services:
+#   backend   — Go WebSocket + CRDT server
+#   frontend  — React development server (with hot reload)
+#
+# Usage:
+#   docker compose up              # Start all services
+#   docker compose up backend      # Start only the server
+#   LLM_API_KEY=sk-... docker compose up  # With AI enabled
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_API_URL=${LLM_API_URL:-https://api.openai.com/v1}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_SERVER_URL=ws://localhost:8080/ws
+      - CHOKIDAR_USEPOLLING=true  # Required for hot-reload in Docker on macOS
+    volumes:
+      - ./frontend/src:/app/src  # Mount source for hot reload
+    depends_on:
+      backend:
+        condition: service_healthy
+    stdin_open: true
+
+networks:
+  default:
+    driver: bridge

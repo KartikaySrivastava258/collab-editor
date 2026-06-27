@@ -1,0 +1,39 @@
+# ── Go ─────────────────────────────────────────────────────────────────────
+backend/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+
+# ── Node / React ────────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/build/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Environment / Secrets ───────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Docker ──────────────────────────────────────────────────────────────────
+.dockerignore
+
+# ── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE ─────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
