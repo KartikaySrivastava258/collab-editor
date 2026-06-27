@@ -37,7 +37,7 @@ In a distributed system with no central clock, two users can type into the same 
 
 ---
 
-## ✨ Features
+## Features
 
 | Feature | Implementation |
 |---|---|
@@ -50,7 +50,7 @@ In a distributed system with no central clock, two users can type into the same 
 
 ---
 
-## 🏗 Architecture
+##  Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -126,7 +126,7 @@ collab-editor/
 
 ---
 
-## 🧠 Design Decisions
+##  Design Decisions
 
 ### 1. Why CRDT over Operational Transformation?
 
@@ -192,7 +192,7 @@ The Hub's `run()` loop is intentionally a **single goroutine** reading from chan
 
 ---
 
-## 🚀 Quick Start
+###  Quick Start
 
 ### Prerequisites
 
@@ -241,7 +241,7 @@ docker compose up backend
 
 ---
 
-## 🧪 Testing
+##  Testing
 
 ```bash
 # Run Go tests with race detector
@@ -259,7 +259,7 @@ The race detector test (`TestConcurrentAccess_NoDataRace`) spawns 100 concurrent
 
 ---
 
-## 📡 API Reference
+##  API Reference
 
 ### WebSocket — `GET /ws?roomId=<id>&clientId=<id>`
 
@@ -297,7 +297,7 @@ Upgrades to a WebSocket connection. The server immediately sends an `init` messa
 
 ---
 
-## 🛣 Potential Extensions
+##  Potential Extensions
 
 | Extension | Complexity | Value |
 |---|---|---|
@@ -310,7 +310,7 @@ Upgrades to a WebSocket connection. The server immediately sends an `init` messa
 
 ---
 
-## 🔗 References
+##  References
 
 - [Logoot: A Scalable Optimistic Replication Algorithm](https://hal.inria.fr/inria-00432368/document) — Martin et al., 2009
 - [A comprehensive study of CRDTs](https://hal.inria.fr/inria-00555588/document) — Shapiro et al., 2011
