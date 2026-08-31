@@ -15,7 +15,13 @@ import { ConnectionStatus, Peer } from '../types/crdt';
 interface StatusBadgeProps {
   status: ConnectionStatus;
 }
-
+const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
+  const config = {
+    connecting:   { color: '#f59e0b', label: 'Connecting…',  dot: '○' },
+    connected:    { color: '#10b981', label: 'Connected',     dot: '●' },
+    disconnected: { color: '#6b7280', label: 'Disconnected',  dot: '○' },
+    error:        { color: '#ef4444', label: 'Error',         dot: '●' },
+  }[status];
 
 
   return (
