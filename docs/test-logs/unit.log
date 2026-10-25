@@ -1,0 +1,311 @@
+
+> collab-editor-frontend@2.0.0 test
+> node --test "src/**/*.test.ts"
+
+TAP version 13
+# Subtest: R1 regression: 10k sequential chars then a mid-document insert lands at the exact index
+ok 1 - R1 regression: 10k sequential chars then a mid-document insert lands at the exact index
+  ---
+  duration_ms: 42.553751
+  type: 'test'
+  ...
+# Subtest: R1 regression: 20k inserts always at the front (worst case for fractional indices)
+ok 2 - R1 regression: 20k inserts always at the front (worst case for fractional indices)
+  ---
+  duration_ms: 152.035651
+  type: 'test'
+  ...
+# Subtest: R2 regression: concurrent same-position inserts, then each deletes its own char
+ok 3 - R2 regression: concurrent same-position inserts, then each deletes its own char
+  ---
+  duration_ms: 2.567924
+  type: 'test'
+  ...
+# Subtest: concurrent runs at the same position do not interleave and order deterministically
+ok 4 - concurrent runs at the same position do not interleave and order deterministically
+  ---
+  duration_ms: 0.591833
+  type: 'test'
+  ...
+# Subtest: idGreater is a strict total order: t first, then client id
+ok 5 - idGreater is a strict total order: t first, then client id
+  ---
+  duration_ms: 0.158781
+  type: 'test'
+  ...
+# Subtest: local insert lands immediately after its anchor even after remote activity
+ok 6 - local insert lands immediately after its anchor even after remote activity
+  ---
+  duration_ms: 0.197282
+  type: 'test'
+  ...
+# Subtest: duplicate delivery is idempotent
+ok 7 - duplicate delivery is idempotent
+  ---
+  duration_ms: 0.317353
+  type: 'test'
+  ...
+# Subtest: out-of-order delivery: children before parents, delete before insert
+ok 8 - out-of-order delivery: children before parents, delete before insert
+  ---
+  duration_ms: 0.222024
+  type: 'test'
+  ...
+# Subtest: rejects causally invalid inserts (t must exceed origin t)
+ok 9 - rejects causally invalid inserts (t must exceed origin t)
+  ---
+  duration_ms: 0.798913
+  type: 'test'
+  ...
+# Subtest: rejects malformed ops
+ok 10 - rejects malformed ops
+  ---
+  duration_ms: 0.755142
+  type: 'test'
+  ...
+# Subtest: same ID with different content is a conflict, not silently accepted
+ok 11 - same ID with different content is a conflict, not silently accepted
+  ---
+  duration_ms: 0.30464
+  type: 'test'
+  ...
+# Subtest: document and pending-buffer limits are enforced
+ok 12 - document and pending-buffer limits are enforced
+  ---
+  duration_ms: 0.36301
+  type: 'test'
+  ...
+# Subtest: Unicode: emoji, combining marks, ZWJ sequences, CJK round-trip and converge
+ok 13 - Unicode: emoji, combining marks, ZWJ sequences, CJK round-trip and converge
+  ---
+  duration_ms: 0.311175
+  type: 'test'
+  ...
+# Subtest: Unicode: lone surrogates are replaced, never stored
+ok 14 - Unicode: lone surrogates are replaced, never stored
+  ---
+  duration_ms: 0.768385
+  type: 'test'
+  ...
+# Subtest: Unicode: concurrent inserts inside an emoji neighbourhood never split a code point
+ok 15 - Unicode: concurrent inserts inside an emoji neighbourhood never split a code point
+  ---
+  duration_ms: 0.232205
+  type: 'test'
+  ...
+# Subtest: snapshot gives a late joiner identical state, including tombstones
+ok 16 - snapshot gives a late joiner identical state, including tombstones
+  ---
+  duration_ms: 0.472987
+  type: 'test'
+  ...
+# Subtest: offline edits on both sides merge via snapshot exchange
+ok 17 - offline edits on both sides merge via snapshot exchange
+  ---
+  duration_ms: 0.338896
+  type: 'test'
+  ...
+# Subtest: toOps rebuilds an identical document (used for server-restart recovery)
+ok 18 - toOps rebuilds an identical document (used for server-restart recovery)
+  ---
+  duration_ms: 3.293339
+  type: 'test'
+  ...
+# Subtest: randomized convergence: 1000 seeds x 4 replicas x 60 steps, random order + duplicates
+ok 19 - randomized convergence: 1000 seeds x 4 replicas x 60 steps, random order + duplicates
+  ---
+  duration_ms: 674.575722
+  type: 'test'
+  ...
+# Subtest: single-writer intent: random edits match a plain-string model (500 seeds)
+ok 20 - single-writer intent: random edits match a plain-string model (500 seeds)
+  ---
+  duration_ms: 36.989816
+  type: 'test'
+  ...
+# Subtest: shuffle helper is deterministic for a seed
+ok 21 - shuffle helper is deterministic for a seed
+  ---
+  duration_ms: 0.256133
+  type: 'test'
+  ...
+# Subtest: diffText: typing, deleting, replacing a selection (baseline bug U1)
+ok 22 - diffText: typing, deleting, replacing a selection (baseline bug U1)
+  ---
+  duration_ms: 1.676176
+  type: 'test'
+  ...
+# Subtest: diffText: caret disambiguates repeated characters
+ok 23 - diffText: caret disambiguates repeated characters
+  ---
+  duration_ms: 0.250942
+  type: 'test'
+  ...
+# Subtest: diffText: paste and IME-style multi-character input (baseline bug U2)
+ok 24 - diffText: paste and IME-style multi-character input (baseline bug U2)
+  ---
+  duration_ms: 0.157491
+  type: 'test'
+  ...
+# Subtest: diffText: never splits surrogate pairs (baseline bug U3)
+ok 25 - diffText: never splits surrogate pairs (baseline bug U3)
+  ---
+  duration_ms: 1.458564
+  type: 'test'
+  ...
+# Subtest: diffText: randomized edits always reproduce the target and keep pairs intact
+ok 26 - diffText: randomized edits always reproduce the target and keep pairs intact
+  ---
+  duration_ms: 46.055706
+  type: 'test'
+  ...
+# Subtest: utf16 <-> code point index mapping
+ok 27 - utf16 <-> code point index mapping
+  ---
+  duration_ms: 0.273313
+  type: 'test'
+  ...
+# Subtest: history: undo/redo typing merges consecutive keystrokes
+ok 28 - history: undo/redo typing merges consecutive keystrokes
+  ---
+  duration_ms: 1.366588
+  type: 'test'
+  ...
+# Subtest: history: undo of a deletion restores text in place
+ok 29 - history: undo of a deletion restores text in place
+  ---
+  duration_ms: 0.329532
+  type: 'test'
+  ...
+# Subtest: history: undo only reverts own edits and converges with a collaborator
+ok 30 - history: undo only reverts own edits and converges with a collaborator
+  ---
+  duration_ms: 2.80337
+  type: 'test'
+  ...
+# Subtest: history: a new edit clears the redo stack
+ok 31 - history: a new edit clears the redo stack
+  ---
+  duration_ms: 0.485831
+  type: 'test'
+  ...
+# Subtest: history: a sealed (programmatic) insertion is a separate undo step on both sides
+ok 32 - history: a sealed (programmatic) insertion is a separate undo step on both sides
+  ---
+  duration_ms: 0.307278
+  type: 'test'
+  ...
+# Subtest: SyncClient (deterministic)
+    # Subtest: connects, applies welcome, reports connected and synced
+    ok 1 - connects, applies welcome, reports connected and synced
+      ---
+      duration_ms: 2.40184
+      type: 'test'
+      ...
+    # Subtest: backoff grows exponentially with jitter, is bounded, and resets after welcome
+    ok 2 - backoff grows exponentially with jitter, is bounded, and resets after welcome
+      ---
+      duration_ms: 1.424864
+      type: 'test'
+      ...
+    # Subtest: stop() cancels pending reconnects and closes the socket
+    ok 3 - stop() cancels pending reconnects and closes the socket
+      ---
+      duration_ms: 0.339586
+      type: 'test'
+      ...
+    # Subtest: replaced session (4001) does not reconnect
+    ok 4 - replaced session (4001) does not reconnect
+      ---
+      duration_ms: 0.472185
+      type: 'test'
+      ...
+    # Subtest: edits made offline are queued, then sent as one sync batch after welcome; ack clears them
+    ok 5 - edits made offline are queued, then sent as one sync batch after welcome; ack clears them
+      ---
+      duration_ms: 9.414892
+      type: 'test'
+      ...
+    # Subtest: online edits are batched per microtask and acked
+    ok 6 - online edits are batched per microtask and acked
+      ---
+      duration_ms: 4.506563
+      type: 'test'
+      ...
+    # Subtest: reconnect re-sends only what the server is missing
+    ok 7 - reconnect re-sends only what the server is missing
+      ---
+      duration_ms: 1.087068
+      type: 'test'
+      ...
+    # Subtest: server lost the room (empty snapshot, new epoch): full state is restored via sync
+    ok 8 - server lost the room (empty snapshot, new epoch): full state is restored via sync
+      ---
+      duration_ms: 0.743952
+      type: 'test'
+      ...
+    # Subtest: rejected batch: local state is rolled back to the server snapshot with a notice
+    ok 9 - rejected batch: local state is rolled back to the server snapshot with a notice
+      ---
+      duration_ms: 1.363026
+      type: 'test'
+      ...
+    # Subtest: heartbeat timeout drops a half-open socket and reconnects
+    ok 10 - heartbeat timeout drops a half-open socket and reconnects
+      ---
+      duration_ms: 0.707103
+      type: 'test'
+      ...
+    # Subtest: missing welcome after open is treated as a failed attempt
+    ok 11 - missing welcome after open is treated as a failed attempt
+      ---
+      duration_ms: 0.319805
+      type: 'test'
+      ...
+    # Subtest: AI: disabled server refuses locally; stale and cancelled results are ignored
+    ok 12 - AI: disabled server refuses locally; stale and cancelled results are ignored
+      ---
+      duration_ms: 0.418019
+      type: 'test'
+      ...
+    # Subtest: AI: disconnect while thinking surfaces an error instead of hanging
+    ok 13 - AI: disconnect while thinking surfaces an error instead of hanging
+      ---
+      duration_ms: 0.167033
+      type: 'test'
+      ...
+    # Subtest: missingOps computes inserts then deletes the server lacks
+    ok 14 - missingOps computes inserts then deletes the server lacks
+      ---
+      duration_ms: 0.246803
+      type: 'test'
+      ...
+    1..14
+ok 33 - SyncClient (deterministic)
+  ---
+  duration_ms: 25.370487
+  type: 'suite'
+  ...
+# Subtest: SyncClient against the test server
+    # Subtest: two clients converge; server restart loses memory but clients restore the room
+    ok 1 - two clients converge; server restart loses memory but clients restore the room
+      ---
+      duration_ms: 124.92795
+      type: 'test'
+      ...
+    1..1
+ok 34 - SyncClient against the test server
+  ---
+  duration_ms: 125.181193
+  type: 'suite'
+  ...
+1..34
+# tests 47
+# suites 2
+# pass 47
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1846.942458
+exit=0

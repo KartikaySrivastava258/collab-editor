@@ -1,0 +1,24 @@
+# Baseline reproduction log (original code, 2026-10-25T18:59:00Z)
+$ tsx repro_original_crdt.ts
+FAIL  R1 typing 86 chars then inserting mid-document lands at intended index
+      ids distinct=70/86; expected …"five doz#en liqu"… got …"five dozen# liqu"… (pre-insert text intact: true)
+      first duplicate fractional ID at char index 55
+PASS  R2 concurrent same-position inserts + delete converge and delete the right char
+FAIL  R3 randomized convergence (200 seeds x 3 replicas x 40 ops, full redelivery)
+      179/200 runs ended with divergent replicas
+INFO  R4 '😀'.length === 2 -> keydown handler requires e.key.length === 1, so emoji is dropped
+
+2 failure(s) reproduced
+
+$ tsx repro_r2b.ts
+ids: A=0.5 B=0.5; bob="A" alice="B" -> DIVERGED (alice deleted the wrong character)
+
+$ node repro_ui.mjs   (original UI bundled with esbuild, Chromium headless)
+FAIL  U1 typing over a selection replaces it — value="Xhello"
+FAIL  U2 non-keydown text input (paste / IME / emoji picker) is kept — after insertText value="abZZ"; after next keystroke value="abc"
+FAIL  U3 typing an emoji via keyboard — value="ab"
+FAIL  U4 unreachable server -> retries / reconnecting state — status shown: "○Disconnected" then "○Disconnected" after 3s, no retry scheduled
+console errors: 9 [
+  '[WS] Error: Event',
+  "WebSocket connection to 'ws://127.0.0.1:9/ws?roomId=room_repro&clientId=user_4y7k047g' fai"
+]

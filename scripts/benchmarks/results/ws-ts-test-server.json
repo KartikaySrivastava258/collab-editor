@@ -1,0 +1,65 @@
+{
+  "benchmark": "websocket",
+  "implementation": "ts-test-server",
+  "server": "http://127.0.0.1:8370",
+  "environment": {
+    "date": "2026-10-25T19:47:26.874Z",
+    "os": "Linux 6.18.44-fc-v153 x64",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cpus": 1,
+    "memoryGiB": 3.9,
+    "node": "v22.22.2",
+    "note": "load generator and server share the same machine"
+  },
+  "latency": {
+    "workload": "1 sender + 1 receiver; 1,000 single-character insert batches sent one at a time (next sent after ack + 5 ms); 100 warm-up ops excluded",
+    "remoteApplyMs": {
+      "n": 1000,
+      "min": 0.202,
+      "p50": 0.379,
+      "p95": 0.828,
+      "p99": 2.403,
+      "max": 9.583,
+      "mean": 0.468
+    },
+    "senderAckRttMs": {
+      "n": 1000,
+      "min": 0.32,
+      "p50": 0.504,
+      "p95": 1.141,
+      "p99": 3.788,
+      "max": 9.762,
+      "mean": 0.618
+    }
+  },
+  "throughput": {
+    "workload": "10 clients in one room; 2 writers send 10-character insert batches at random positions with up to 8 unacked batches each, for 10 s; 8 passive receivers",
+    "acceptedOpsPerSec": 3679,
+    "totalOps": 36860,
+    "docChars": 36860,
+    "fanOutOpsDeliveredPerSec": 33114,
+    "converged": true,
+    "disconnects": 0,
+    "server": {
+      "rssMiBStart": 94.7,
+      "rssMiBPeak": 112.2,
+      "rssMiBEnd": 111.8,
+      "cpuPercentAvg": 14.1,
+      "samples": 19,
+      "sampleIntervalMs": 500
+    }
+  },
+  "recovery": {
+    "workload": "20 outages (+1 warm-up): connection cut via TCP proxy, 13 characters typed offline, network restored and an immediate retry triggered; timed until connected and every edit acknowledged. Excludes backoff wait (backoff schedule: 0.5 s × 2^n with equal jitter, capped at 30 s).",
+    "recoveryMs": {
+      "n": 20,
+      "min": 3.257,
+      "p50": 4.654,
+      "p95": 13.243,
+      "p99": 13.747,
+      "max": 13.747,
+      "mean": 5.8
+    },
+    "serverMatchesClient": true
+  }
+}

@@ -1,19 +1,10 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
+import { createRoot } from 'react-dom/client';
+import App from './App.tsx';
+import './styles.css';
 
-// Reset browser default margins/paddings globally
-const style = document.createElement('style');
-style.textContent = `
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body, #root { height: 100%; }
-  body { background: #f9fafb; }
-`;
-document.head.appendChild(style);
-
-const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-root.render(
+createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );

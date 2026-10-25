@@ -1,0 +1,110 @@
+{
+  "benchmark": "crdt",
+  "environment": {
+    "date": "2026-10-25T19:46:35.738Z",
+    "os": "Linux 6.18.44-fc-v153 x64",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cpus": 1,
+    "memoryGiB": 3.9,
+    "node": "v22.22.2"
+  },
+  "method": "Seeded workloads (mulberry32). Timing: 2 warm-up + 10 measured runs, wall clock via performance.now(). Convergence: replicas edit randomly, receive peers' ops in causal FIFO order with duplicates, then all remaining ops; converged = identical final text on all replicas.",
+  "timing": {
+    "sequentialTyping": {
+      "workload": "10000 single-character inserts appended at the end, one replica",
+      "baseline": {
+        "label": "baseline",
+        "runs": {
+          "n": 10,
+          "min": 221.863,
+          "p50": 230.317,
+          "p95": 268.486,
+          "p99": 268.486,
+          "max": 268.486,
+          "mean": 238.796
+        }
+      },
+      "rga": {
+        "label": "rga",
+        "runs": {
+          "n": 10,
+          "min": 5.368,
+          "p50": 6.432,
+          "p95": 8.77,
+          "p99": 8.77,
+          "max": 8.77,
+          "mean": 6.525
+        }
+      }
+    },
+    "remoteApply": {
+      "workload": "5,000 inserts at seeded random positions generated on one replica, integrated on a fresh replica",
+      "baseline": {
+        "label": "baseline",
+        "runs": {
+          "n": 10,
+          "min": 43.565,
+          "p50": 44.121,
+          "p95": 56.457,
+          "p99": 56.457,
+          "max": 56.457,
+          "mean": 46.43
+        }
+      },
+      "rga": {
+        "label": "rga",
+        "runs": {
+          "n": 10,
+          "min": 5.151,
+          "p50": 5.462,
+          "p95": 12.106,
+          "p99": 12.106,
+          "max": 12.106,
+          "mean": 6.545
+        }
+      }
+    }
+  },
+  "perOpInsertMicros": {
+    "workload": "2,000 single-char inserts at random anchors into a 10,000-char RGA document",
+    "n": 2000,
+    "min": 2.237,
+    "p50": 3.856,
+    "p95": 5.179,
+    "p99": 9.36,
+    "max": 40.685,
+    "mean": 4.088
+  },
+  "correctness": {
+    "convergence": {
+      "baseline": {
+        "seeds": 500,
+        "replicas": 3,
+        "steps": 60,
+        "converged": 1,
+        "rate": 0.2
+      },
+      "rga": {
+        "seeds": 500,
+        "replicas": 3,
+        "steps": 60,
+        "converged": 500,
+        "rate": 100
+      }
+    },
+    "singleWriterIntent": {
+      "baseline": {
+        "seeds": 500,
+        "steps": 200,
+        "matchesModel": 5,
+        "rate": 1
+      },
+      "rga": {
+        "seeds": 500,
+        "steps": 200,
+        "matchesModel": 500,
+        "rate": 100
+      }
+    }
+  }
+}

@@ -26,7 +26,6 @@ yarn-error.log*
 !.env.example
 
 # ── Docker ──────────────────────────────────────────────────────────────────
-.dockerignore
 
 # ── OS ──────────────────────────────────────────────────────────────────────
 .DS_Store
@@ -38,3 +37,9 @@ Thumbs.db
 *.swp
 *.swo
 start.sh
+
+# ── Test / benchmark output ─────────────────────────────────────────────────
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+scripts/benchmarks/results/*.tmp.json
