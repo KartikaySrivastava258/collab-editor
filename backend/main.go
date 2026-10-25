@@ -1,104 +1,108 @@
-// main.go — entry point for the Real-Time Collaborative Editor server.
+// Command collab-editor-server runs the real-time collaborative editor.
 //
-// Startup sequence:
-//  1. Load configuration from environment variables.
-//  2. Initialize the CRDT Hub and start its event loop.
-//  3. Register HTTP/WebSocket endpoints.
-//  4. Start the HTTP server with graceful shutdown support.
+// Startup: load + validate config (fail fast), build the hub, optionally the
+// AI client, then serve HTTP. On SIGINT/SIGTERM: readiness flips to 503,
+// WebSocket clients get close code 1001, then the listener shuts down.
 package main
 
 import (
 	"context"
-	"log"
+	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
-	"github.com/yourusername/collab-editor/api"
-	"github.com/yourusername/collab-editor/hub"
+	"collab-editor/ai"
+	"collab-editor/api"
+	"collab-editor/config"
+	"collab-editor/hub"
 )
 
 func main() {
-	// ── Configuration ────────────────────────────────────────────────────────
-	port := getEnv("PORT", "8080")
-	llmAPIKey := getEnv("LLM_API_KEY", "") // Optional — agent degrades gracefully
-	llmAPIURL := getEnv("LLM_API_URL", "https://api.openai.com/v1")
+	// `collab-editor-server healthcheck` probes /healthz on the configured port
+	// and exits 0/1. Used by Docker HEALTHCHECK (the runtime image has no shell).
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(healthcheck())
+	}
+	cfg, err := config.Load(os.Getenv)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	var handler slog.Handler = slog.NewJSONHandler(os.Stdout, nil)
+	if cfg.LogFormat == "text" {
+		handler = slog.NewTextHandler(os.Stdout, nil)
+	}
+	log := slog.New(handler)
 
-	log.Printf("╔══════════════════════════════════════════╗")
-	log.Printf("║  Real-Time Collaborative Editor Server  ║")
-	log.Printf("╚══════════════════════════════════════════╝")
-	log.Printf("Port:        %s", port)
-	log.Printf("LLM API:     %s", func() string {
-		if llmAPIKey != "" {
-			return llmAPIURL + " (configured)"
-		}
-		return "not configured (agent in demo mode)"
-	}())
+	hubCfg := hub.Config{
+		MaxDocAtoms:       cfg.MaxDocAtoms,
+		MaxRooms:          cfg.MaxRooms,
+		MaxClientsPerRoom: cfg.MaxClientsPerRoom,
+		MaxMessageBytes:   cfg.MaxMessageBytes,
+		AITimeout:         cfg.AITimeout,
+		Logger:            log,
+	}
+	if cfg.AIEnabled() {
+		hubCfg.AI = ai.New(cfg.LLMAPIURL, cfg.LLMAPIKey, cfg.LLMModel)
+	}
+	h := hub.New(hubCfg)
 
-	// ── Hub Initialization ───────────────────────────────────────────────────
-	// The Hub runs as a single background goroutine that serializes all
-	// room/client mutations — safe concurrency without coarse-grained locking.
-	h := hub.NewHub()
-	go h.Run()
-	log.Printf("Hub started")
-
-	// ── HTTP Routes ───────────────────────────────────────────────────────────
-	mux := http.NewServeMux()
-	handler := api.NewHandler(h, llmAPIKey, llmAPIURL)
-	handler.RegisterRoutes(mux)
-
-	// CORS middleware — allows the React dev server (localhost:3000) to connect
-	corsMiddleware := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-			if r.Method == http.MethodOptions {
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
+	srv := &http.Server{
+		Addr:              ":" + strconv.Itoa(cfg.Port),
+		Handler:           api.New(h, cfg.AllowedOrigins, cfg.StaticDir, log),
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
-	// ── HTTP Server with Graceful Shutdown ────────────────────────────────────
-	server := &http.Server{
-		Addr:         ":" + port,
-		Handler:      corsMiddleware(mux),
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
-
-	// Start in background goroutine to allow graceful shutdown handling
+	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("Listening on http://localhost:%s", port)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server error: %v", err)
-		}
+		log.Info("listening", "port", cfg.Port, "ai_enabled", cfg.AIEnabled(), "static", cfg.StaticDir != "",
+			"allowed_origins", cfg.AllowedOrigins, "persistence", "memory")
+		errCh <- srv.ListenAndServe()
 	}()
 
-	// Block until OS signal (Ctrl+C, SIGTERM from Docker/k8s)
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	<-quit
-
-	log.Println("Shutting down gracefully...")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Forced shutdown: %v", err)
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	select {
+	case sig := <-stop:
+		log.Info("shutdown_started", "signal", sig.String())
+	case err := <-errCh:
+		if !errors.Is(err, http.ErrServerClosed) {
+			log.Error("server_error", "error", err.Error())
+			os.Exit(1)
+		}
 	}
-	log.Println("Server stopped cleanly")
+
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	defer cancel()
+	if err := h.Shutdown(ctx); err != nil {
+		log.Warn("hub_shutdown_timeout", "error", err.Error())
+	}
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Warn("http_shutdown_timeout", "error", err.Error())
+	}
+	log.Info("shutdown_complete")
 }
 
-// getEnv reads an environment variable with a fallback default.
-func getEnv(key, defaultVal string) string {
-	if val := os.Getenv(key); val != "" {
-		return val
+func healthcheck() int {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
-	return defaultVal
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://127.0.0.1:" + port + "/healthz")
+	if err != nil {
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }

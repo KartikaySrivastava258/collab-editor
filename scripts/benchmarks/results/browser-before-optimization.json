@@ -1,0 +1,97 @@
+{
+  "benchmark": "browser",
+  "server": "http://127.0.0.1:8380",
+  "implementation": "ts-test-server",
+  "environment": {
+    "date": "2026-10-25T19:48:49.605Z",
+    "os": "Linux 6.18.44-fc-v153",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cpus": 1,
+    "node": "v22.22.2",
+    "browser": "chromium 141.0.7390.37 (headless)"
+  },
+  "localInput": [
+    {
+      "docChars": 0,
+      "handlerMs": {
+        "n": 300,
+        "p50": 1,
+        "p95": 2.4,
+        "p99": 4.1,
+        "max": 6.1,
+        "mean": 1.106
+      },
+      "inputToNextFrameMs": {
+        "n": 300,
+        "p50": 7.5,
+        "p95": 15.5,
+        "p99": 18.3,
+        "max": 22.6,
+        "mean": 8.259
+      }
+    },
+    {
+      "docChars": 20000,
+      "handlerMs": {
+        "n": 300,
+        "p50": 2.2,
+        "p95": 5,
+        "p99": 6.9,
+        "max": 8.4,
+        "mean": 2.631
+      },
+      "inputToNextFrameMs": {
+        "n": 300,
+        "p50": 8.4,
+        "p95": 18.4,
+        "p99": 25.4,
+        "max": 34.3,
+        "mean": 9.66
+      }
+    },
+    {
+      "docChars": 100000,
+      "handlerMs": {
+        "n": 300,
+        "p50": 8.4,
+        "p95": 13.3,
+        "p99": 34.7,
+        "max": 44.3,
+        "mean": 9.63
+      },
+      "inputToNextFrameMs": {
+        "n": 300,
+        "p50": 14.2,
+        "p95": 22.6,
+        "p99": 41.7,
+        "max": 51.3,
+        "mean": 15.72
+      }
+    }
+  ],
+  "remoteEdit": {
+    "samples": 200,
+    "latencyMs": {
+      "n": 200,
+      "p50": 16,
+      "p95": 21,
+      "p99": 23,
+      "max": 25,
+      "mean": 14.86
+    }
+  },
+  "bundle": {
+    "builtAt": "2026-10-25T19:48:15.972Z",
+    "esbuild": "0.27.7",
+    "files": {
+      "assets/app.js": {
+        "bytes": 240422,
+        "gzipBytes": 74844
+      },
+      "assets/app.css": {
+        "bytes": 13924,
+        "gzipBytes": 3716
+      }
+    }
+  }
+}

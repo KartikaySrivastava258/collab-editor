@@ -1,330 +1,180 @@
-<div align="center">
+# Collab Editor
 
-# ✦ Collab Editor
+[![CI](https://github.com/KartikaySrivastava258/collab-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/KartikaySrivastava258/collab-editor/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-### Real-Time Collaborative Document Editor
+A real-time collaborative plain-text editor: a Go WebSocket server and a React client that merge
+concurrent edits with an RGA sequence CRDT, keep working through disconnects, and report sync state
+truthfully.
 
-**A production-grade distributed systems project** demonstrating Conflict-Free Replicated Data Types (CRDTs), concurrent WebSocket architecture in Go, and an asynchronous AI writing agent.
+![Dark editor workspace: sidebar with recent rooms, header showing “Connected” and two collaborator avatars, a document in the writing canvas, and a status bar reading “All changes synced to server memory”.](docs/screenshots/01-workspace.png)
 
-[![CI](https://github.com/yourusername/collab-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/collab-editor/actions)
-[![Go](https://img.shields.io/badge/Go-1.22-00ADD8?logo=go)](https://go.dev/)
-[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript)](https://www.typescriptlang.org/)
-[![Zero Deps](https://img.shields.io/badge/Go_deps-zero-brightgreen)](backend/go.mod)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<sub>All screenshots are generated from real browser sessions by `frontend/bench/capture-screenshots.mjs`.</sub>
 
-[**Live Demo**](#) · [Architecture](#-architecture) · [Quick Start](#-quick-start) · [Design Decisions](#-design-decisions)
+## Project status
 
-</div>
-
----
-
-## What This Is
-
-Collab Editor is a **Google Docs–style real-time collaborative text editor** built from first principles. Multiple users can type simultaneously in the same document, and every replica converges to the identical text — guaranteed — regardless of network latency, packet reordering, or concurrent edits.
-
-The system also includes an **AI writing agent** that observes the document, waits for the user to pause, calls an LLM API, and types its response character-by-character into the shared document — behaving exactly like a live collaborator.
-
-> **Zero external Go dependencies.** The WebSocket protocol (RFC 6455) is implemented from scratch using only `net/http`, `crypto/sha1`, and `encoding/binary`. Every distributed systems mechanic — CRDT ordering, Lamport clocks, WebSocket framing, goroutine lifecycle — is fully auditable in the source.
-
-### Why This Problem Is Hard
-
-In a distributed system with no central clock, two users can type into the same position at the exact same millisecond. A naive "last write wins" approach would silently delete one user's character. The system must:
-
-1. **Never lose data** — every character from every client must survive.
-2. **Converge deterministically** — after all messages are delivered, every replica must hold the *identical* document, regardless of message delivery order.
-3. **Feel instant** — the editor must never wait for a server round-trip before showing the user their own keystrokes.
-
----
-
-## Features
-
-| Feature | Implementation |
+| Area | State |
 |---|---|
-| **Real-time sync** | WebSocket-based mutation broadcasting |
-| **Conflict-free editing** | Fractional-index CRDT with Lamport timestamps |
-| **AI collaborator** | Debounced LLM agent that types live into the document |
-| **Cursor preservation** | Remote inserts/deletes shift cursor without interrupting typing |
-| **Room-based sessions** | Share a URL hash to invite collaborators |
-| **Graceful degradation** | AI agent works in demo mode without an API key |
+| CRDT, sync client, editor, UI | 47 unit/property tests, 28 protocol conformance tests, 31 Chromium end-to-end tests |
+| Go server | Stdlib-only WebSocket layer, per-room ordering, backpressure, presence, opt-in AI; 50 Go test/fuzz functions, and CI runs the same protocol and browser suites against the Go binary |
+| Persistence | **Memory only** for now. See [limitations](docs/KNOWN_LIMITATIONS.md). |
+| Auth | **None.** Anyone with a room link can edit. |
 
----
+## Features (each covered by tests)
 
-##  Architecture
+- **Conflict-free concurrent editing.** An RGA CRDT with unique `(client, Lamport)` IDs. Replicas
+  converge regardless of delivery order, duplicates or late joins (property-tested against an
+  independent oracle; Go and TS implementations share 45 cross-language test vectors).
+- **Offline-tolerant sync.** Edits are queued until acknowledged. Reconnect uses jittered
+  exponential backoff plus a heartbeat, and re-sends only what the server is missing. After a
+  server restart, connected clients restore the room.
+- **Correct text input.** Typing over selections, paste, IME composition, emoji and non-BMP text,
+  and a caret anchored to characters (not offsets) while others edit.
+- **Undo/redo of your own edits only**, expressed as CRDT operations.
+- **Truthful UI.** The connection state, real presence, "synced" only after a server ack,
+  memory-only storage clearly labelled, and AI disabled with a stated reason when not configured.
+- **Optional AI suggestions** (OpenAI-compatible): private to the requester, inserted only on
+  request, with cancellation, timeout and provider errors surfaced.
+- **Dark, responsive, accessible shell.** Sidebar/drawer, keyboard-reachable controls, focus
+  management, reduced motion, WCAG AA text contrast.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Go Backend                                │
-│                                                                  │
-│  ┌──────────┐    register     ┌────────────────────────────┐    │
-│  │ Client A │ ─────────────► │         WebSocket Hub       │    │
-│  │ readPump │ ◄── broadcast ─ │                            │    │
-│  │writePump │                 │  rooms: map[RoomID]Clients │    │
-│  └──────────┘                 │  docs:  map[RoomID]*CRDT   │    │
-│  ┌──────────┐    mutations    │                            │    │
-│  │ Client B │ ─────────────► │  broadcast chan (1024 buf) │    │
-│  │ readPump │ ◄── broadcast ─ │                            │    │
-│  │writePump │                 └────────────┬───────────────┘    │
-│  └──────────┘                              │                     │
-│                                      notify on                   │
-│                                     human edit                   │
-│                                            │                     │
-│                               ┌────────────▼───────────────┐    │
-│                               │       AI Agent Worker       │    │
-│                               │                            │    │
-│                               │  1. Debounce 2s            │    │
-│                               │  2. LLM API call           │    │
-│                               │  3. Type chars @ 50ms each │    │
-│                               └────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-                                    │ WebSocket
-┌───────────────────────────────────▼─────────────────────────────┐
-│                       React Frontend                             │
-│                                                                  │
-│  useCollabEditor hook                                            │
-│  ┌────────────────────────────────────────────────────────┐     │
-│  │  CRDTDocument (TypeScript)                             │     │
-│  │  ┌────────────────────────────────────────────────┐   │     │
-│  │  │  chars: Char[] — sorted by fractional ID       │   │     │
-│  │  │  [0.0|sentinel] [0.25|'H'] [0.5|'i'] [1.0|sen]│   │     │
-│  │  └────────────────────────────────────────────────┘   │     │
-│  │  insertLocal()  → Mutation → WebSocket.send()          │     │
-│  │  applyRemote()  ← Mutation ← WebSocket.onmessage()     │     │
-│  └────────────────────────────────────────────────────────┘     │
-└──────────────────────────────────────────────────────────────────┘
+<table><tr>
+<td><img src="docs/screenshots/02-collaboration.png" alt="Two browser clients side by side in the same room, each showing both collaborators' text and two avatars."></td>
+</tr><tr>
+<td><img src="docs/screenshots/03-connection-recovery.png" alt="Reconnecting state: amber banner reporting the connection was lost, the next retry time and 24 unsynced changes kept in the tab, with a Retry now button."></td>
+</tr></table>
+
+More: [reconnected](docs/screenshots/03b-reconnected.png) · [mobile (editor + drawer)](docs/screenshots/04-mobile.png) · [test results](docs/screenshots/05-test-results.png) · [AI suggestion panel (mock provider)](docs/screenshots/06-ai-suggestion.png)
+
+## Architecture
+
+```mermaid
+flowchart LR
+  TA[textarea] --> EB[EditorBinding] --> SC[SyncClient]
+  SC <-->|WebSocket, protocol v2| HUB[Go hub: per-room lock, ordered fan-out, bounded queues]
+  HUB --> DOC[(RGA document, in memory)]
+  HUB -.-> AI[optional LLM]
 ```
 
-### Component Breakdown
-
-```
-collab-editor/
-├── backend/
-│   ├── crdt/
-│   │   ├── document.go        # ← CRDT engine: Char, Document, fractional index math
-│   │   └── document_test.go   # ← Convergence, idempotency, race detector tests
-│   ├── hub/
-│   │   └── hub.go             # ← WebSocket Hub: rooms, goroutines, mutex safety
-│   ├── agent/
-│   │   └── agent.go           # ← AI agent: debounce loop, LLM call, char injection
-│   ├── api/
-│   │   └── handler.go         # ← HTTP layer: WebSocket upgrade, REST endpoints
-│   └── main.go                # ← Server entrypoint, graceful shutdown
-│
-├── frontend/
-│   └── src/
-│       ├── types/crdt.ts      # ← Wire protocol TypeScript types
-│       ├── utils/crdtDocument.ts  # ← Client-side CRDT engine (no dependencies)
-│       ├── hooks/useCollabEditor.ts  # ← WebSocket + CRDT React hook
-│       ├── components/
-│       │   └── CollaborativeEditor.tsx  # ← Editor UI, cursor preservation
-│       └── App.tsx            # ← Room routing, session management
-│
-├── docker-compose.yml
-├── Makefile
-└── .github/workflows/ci.yml
-```
-
----
-
-##  Design Decisions
-
-### 1. Why CRDT over Operational Transformation?
-
-**Operational Transformation (OT)** — used by Google Docs — requires a central server to serialize all operations and transform indices. This creates a bottleneck and makes the algorithm stateful.
-
-**CRDTs** assign every character a globally unique, mathematically immutable position. Operations are commutative and associative, so they can be applied in any order and any number of times with the same result.
-
-### 2. Fractional Indexing vs. Tree-Based CRDTs
-
-Libraries like [Yjs](https://github.com/yjs/yjs) use a doubly-linked list with relative references ("insert after CharID X"). This handles infinite insertions at any position but requires a more complex data structure.
-
-This project uses **Logoot-style fractional indexing**:
-
-```
-Position:  0.0   0.25   0.5   0.75   1.0
-           [SEN]  [H]    [i]   [!]   [SEN]
-```
-
-Inserting between `H` (0.25) and `i` (0.5) yields midpoint `0.375`.
-
-**Trade-off:** Eventually, float64 precision limits the number of inserts in the *same position* (after ~52 bisections). For a student project or most real-world documents, this is not a practical concern.
-
-### 3. Lamport Timestamps for Tie-Breaking
-
-When two clients insert at position `0.375` simultaneously, they get the same fractional ID. We break the tie with:
-
-```
-sort order: (fractional_id, lamport_timestamp, client_id_lexicographic)
-```
-
-This is a **total order** — identical on every replica — which is precisely what guarantees convergence.
-
-```go
-func charLess(a, b Char) bool {
-    if a.ID != b.ID           { return a.ID < b.ID }
-    if a.LamportTimestamp != b.LamportTimestamp {
-        return a.LamportTimestamp < b.LamportTimestamp
-    }
-    return a.ClientID < b.ClientID // "AI_AGENT" < "user_alice"
-}
-```
-
-### 4. Tombstoning vs. Deletion
-
-Characters are never physically removed from the array. A "deleted" character becomes a **tombstone** — its `tombstoned` flag is set to `true` and it's excluded from visible text.
-
-Why? If Client A deletes a character and Client B *concurrently* inserts *after* that same character, B's mutation references the soon-to-be-deleted character's ID. If we physically removed it before B's mutation arrived, B's insert would have no anchor and we'd lose their character.
-
-### 5. Go Concurrency Model
-
-```
-Per-connection goroutines:    readPump  →  Hub.broadcast channel
-                              writePump ←  Hub.broadcast channel
-
-Hub goroutine (single):       serializes all room map mutations
-                              no mutex needed within the select loop
-
-AI agent goroutine:           separate goroutine pool
-                              injects via Hub.Broadcast() (channel, thread-safe)
-```
-
-The Hub's `run()` loop is intentionally a **single goroutine** reading from channels. This means the `rooms` map only needs a mutex for out-of-loop reads (by HTTP handlers), not for the core broadcast logic.
-
----
-
-###  Quick Start
-
-### Prerequisites
-
-- **Go 1.21+** — [install](https://go.dev/dl/)
-- **Node.js 18+** — [install](https://nodejs.org/)
-
-### Run Locally
-
-```bash
-# Clone
-git clone https://github.com/yourusername/collab-editor.git
-cd collab-editor
-
-# Install dependencies
-make install
-
-# Start backend + frontend concurrently
-make dev
-```
-
-Open **http://localhost:3000** — you'll be redirected to a new room URL.
-
-Open a second tab at the same URL to see real-time collaboration.
-
-### With AI Agent
-
-```bash
-# Set your OpenAI API key (any OpenAI-compatible API works)
-export LLM_API_KEY=sk-...
-
-# Restart backend
-make backend
-```
-
-The AI agent activates after you pause typing for 2 seconds.
-
-### Docker
-
-```bash
-# Full stack with Docker Compose
-LLM_API_KEY=sk-... docker compose up --build
-
-# Backend only
-docker compose up backend
-```
-
----
-
-##  Testing
-
-```bash
-# Run Go tests with race detector
-make test-go
-
-# Expected output:
-# --- PASS: TestConvergence_ConcurrentInserts (0.00s)
-# --- PASS: TestConvergence_ThreeWay (0.00s)
-# --- PASS: TestIdempotency_DuplicateMutation (0.00s)
-# --- PASS: TestConcurrentAccess_NoDataRace (0.05s)
-# --- PASS: TestFullSession_AliceBobAI (0.00s)
-```
-
-The race detector test (`TestConcurrentAccess_NoDataRace`) spawns 100 concurrent goroutines reading and writing the same document. Zero data races reported.
-
----
-
-##  API Reference
-
-### WebSocket — `GET /ws?roomId=<id>&clientId=<id>`
-
-Upgrades to a WebSocket connection. The server immediately sends an `init` message with the current document state.
-
-**Inbound mutation (client → server):**
-```json
-{
-  "roomId":    "room_abc123",
-  "clientId":  "user_xyz",
-  "opType":    "insert",
-  "charId":    0.375,
-  "value":     "H",
-  "timestamp": 42
-}
-```
-
-**Init message (server → new client):**
-```json
-{
-  "type": "init",
-  "chars": [
-    { "id": 0.25, "value": "H", "clientId": "user_xyz", "timestamp": 1 },
-    { "id": 0.5,  "value": "i", "clientId": "AI_AGENT", "timestamp": 7 }
-  ]
-}
-```
-
-### REST
-
-| Endpoint | Description |
-|---|---|
-| `GET /health` | Health check — returns `{"status":"ok"}` |
-| `GET /api/room/text?roomId=<id>` | Current plaintext of a room |
-
----
-
-##  Potential Extensions
-
-| Extension | Complexity | Value |
+| Layer | Tech | Purpose |
 |---|---|---|
-| Persistent storage (Redis/Postgres) | Medium | High |
-| Presence cursors (show where others are typing) | Medium | High |
-| Rich text (bold/italic) using attribute spans | High | High |
-| Operational replay / version history | High | Medium |
-| Horizontal scaling (Redis Pub/Sub as Hub backend) | High | High |
-| WASM CRDT engine (shared Go/TS code) | Very High | Medium |
+| Server | Go 1.22, stdlib only | WebSocket (RFC 6455, size-bounded), rooms, validation, presence, AI calls, static files |
+| CRDT | Go + TypeScript | Same RGA algorithm on both sides, checked by shared vectors |
+| Client | React 19, TypeScript, esbuild | UI shell; framework-free `SyncClient` and `EditorBinding` |
+| Tests | node:test, Playwright 1.56, Go testing/fuzz | Unit, property, conformance, browser E2E |
 
----
+Details: [Architecture](docs/ARCHITECTURE.md) · [Protocol](docs/PROTOCOL.md) · [What was broken and how it was fixed](docs/DIAGNOSIS.md)
 
-##  References
+## Quick start
 
-- [Logoot: A Scalable Optimistic Replication Algorithm](https://hal.inria.fr/inria-00432368/document) — Martin et al., 2009
-- [A comprehensive study of CRDTs](https://hal.inria.fr/inria-00555588/document) — Shapiro et al., 2011
-- [RFC 6455](https://datatracker.ietf.org/doc/html/rfc6455) — The WebSocket Protocol (implemented from scratch using Go stdlib)
-- [Designing Data-Intensive Applications](https://dataintensive.net/) — Kleppmann (Chapter 9: Consistency and Consensus)
+**Docker** (one image serves the frontend, API and WebSocket):
 
----
+```bash
+docker compose up --build        # → http://localhost:8080
+```
+
+**Local** (Go 1.22+, Node ≥ 22.18):
+
+```bash
+git clone https://github.com/KartikaySrivastava258/collab-editor.git
+cd collab-editor
+make install                     # npm install in frontend/ (Go has no third-party modules)
+make dev                         # Go server :8080 + frontend dev server :3000 → http://localhost:3000
+# or a production-style single origin:
+make build && STATIC_DIR=frontend/dist ./backend/bin/collab-editor-server   # → http://localhost:8080
+```
+
+**Without Go** (protocol test server, for trying the UI only):
+
+```bash
+cd frontend && npm install && npm run build && STATIC_DIR=dist npm run test-server   # → http://localhost:8080
+```
+
+Then follow the [user guide](docs/USER_GUIDE.md): **New document** → **Share** → open the link in
+a second browser.
+
+## Configuration
+
+All optional; see [`.env.example`](.env.example). Invalid values stop the server at startup with an
+explanation.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PORT` | `8080` | HTTP port |
+| `ALLOWED_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Browser origins allowed besides same-origin |
+| `STATIC_DIR` | *(empty)* | Serve the built frontend from this directory |
+| `MAX_DOC_ATOMS` / `MAX_ROOMS` / `MAX_CLIENTS_PER_ROOM` / `MAX_MESSAGE_BYTES` | 200000 / 100 / 50 / 262144 | Resource limits (atoms include deleted characters) |
+| `LLM_API_KEY`, `LLM_MODEL`, `LLM_API_URL`, `AI_TIMEOUT_MS` | off | Optional AI; the model is required when a key is set |
+| `SHUTDOWN_TIMEOUT_MS`, `LOG_FORMAT` | 10000, `json` | Lifecycle and logging |
+| `COLLAB_WS_URL` | dev: `ws://localhost:8080/ws`; prod: same origin | Frontend build-time WebSocket URL |
+
+Endpoints: `/ws`, `/health`, `/healthz`, `/readyz`, `/api/room/text?roomId=` ([protocol](docs/PROTOCOL.md)).
+
+## Tests
+
+```bash
+make test           # Go + frontend unit + protocol conformance + Playwright E2E (TS test server)
+make test-race fuzz # Go race detector + 30 s fuzz
+make test-protocol-go test-e2e-go   # same conformance + browser suites against the Go server
+```
+
+See [TESTING.md](docs/TESTING.md) for what each layer covers and how the suites were
+mutation-checked.
+
+## Measured results
+
+From [BENCHMARKS.md](docs/BENCHMARKS.md): 1-vCPU Linux VM, Node 22.22.2, Chromium 141 headless.
+Network numbers were measured on loopback against the TypeScript protocol server; `make bench-go`
+runs the same workload against the Go binary.
+
+| Metric | Result |
+|---|---|
+| Convergence, original CRDT vs. RGA (500 seeded runs, 3 replicas) | **1/500 → 500/500** |
+| Single-writer edits landing at the intended position (500 runs) | **5/500 → 500/500** |
+| Remote edit latency, sender → receiver (n = 1,000) | p50 0.38 ms · p95 0.83 ms · p99 2.40 ms |
+| Browser-to-browser keystroke visibility (n = 200, ~1 frame resolution) | p50 15 ms · p95 20 ms · p99 27 ms |
+| Reconnect → all edits acked, excluding backoff (n = 20) | p50 4.7 ms · p95 13.2 ms |
+| 10-client room, 10 s load | 36,860 ops, 0 lost, 0 disconnects, all replicas identical (3,679 ops/s, load-generator bound) |
+| Keystroke handler, 100k-char document (profile-guided fix) | p99 **34.7 → 5.3 ms**, p50 8.4 → 1.7 ms |
+| JS / CSS bundle (gzip) | 73.3 KiB / 3.6 KiB |
+
+## Design choices and tradeoffs
+
+- **RGA instead of fractional indices.** No precision exhaustion, provable convergence. Costs:
+  tombstones are kept (bounded by `MAX_DOC_ATOMS`), and order among concurrent runs is by ID.
+- **Textarea plus diffing instead of `contentEditable` or a rich-text framework.** Honest plain-text
+  scope, native IME, selection and accessibility, and one code path for every kind of input.
+- **Server validates whole batches atomically**, and clients roll back on rejection, so replicas
+  never silently diverge.
+- **Memory-only server with client-side restoration.** Simple to operate. Not durable without a
+  connected client.
+- **Stdlib WebSocket.** Zero Go dependencies, hardened and tested, but a maintained library is the
+  recommended next step.
+
+## Security and privacy
+
+No accounts or authorization: room links are bearer access. The server provides origin
+allowlisting, strict input validation, size and rate limits, a CSP for static files, a non-root
+distroless image, and logs without document text, prompts or keys. TLS should be terminated by a
+reverse proxy. There is no end-to-end encryption.
+
+## Roadmap
+
+**Implemented:** everything under Features. **Planned / not implemented:** durable storage (op log
+plus snapshots), authentication and per-room permissions, tombstone compaction, remote
+cursors/selections, a maintained WebSocket library, an axe/screen-reader audit, and multi-instance
+scaling. See [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+
+## Repository layout
+
+```
+backend/    Go server: ws/, hub/, crdt/ (+ testdata/vectors.json), api/, ai/, config/, main.go
+frontend/   React app (src/), TS test server (test-server/), protocol suite (tests/), Playwright (e2e/), bench/
+scripts/benchmarks/   CRDT and WebSocket benchmarks, baseline copy of the original CRDT, results/
+docs/       ARCHITECTURE, PROTOCOL, DIAGNOSIS, TESTING, BENCHMARKS, KNOWN_LIMITATIONS, USER_GUIDE, screenshots/, test-logs/
+```
 
 ## License
 
-MIT © 2024 — Built as a distributed systems portfolio project.
-
----
-
-<div align="center">
-  <sub>Built with Go · React · TypeScript · WebSockets · CRDT theory</sub>
-</div>
+MIT, see [LICENSE](LICENSE). Contributions: open an issue or PR; please run `make test` (and the Go
+suites) before submitting.

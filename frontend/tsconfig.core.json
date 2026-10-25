@@ -1,0 +1,8 @@
+{
+  "//": "Quick type-check of the non-UI modules (no React types involved). `npm run typecheck` checks everything.",
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/crdt", "src/editor", "src/sync", "src/protocol", "src/app", "src/testing",
+    "src/ui/status.ts", "src/config.ts", "test-server", "tests"
+  ]
+}

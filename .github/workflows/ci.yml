@@ -4,96 +4,96 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main]
 
 jobs:
-  # ────────────────────────────────────────────────────────────────────────────
-  # Go Backend — zero external dependencies, pure stdlib
-  # ────────────────────────────────────────────────────────────────────────────
-  backend:
-    name: Go — Build, Vet & Test
+  go:
+    name: Go — fmt, vet, race tests, fuzz smoke
     runs-on: ubuntu-latest
-
+    defaults: { run: { working-directory: backend } }
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
-      - name: Vet
-        working-directory: backend
-        run: go vet ./...
-
-      - name: Build
-        working-directory: backend
-        run: CGO_ENABLED=0 go build -v ./...
-
-      - name: Test with race detector
-        working-directory: backend
-        run: go test -v -race -coverprofile=coverage.out ./...
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          files: backend/coverage.out
-          flags: backend
-
-  # ────────────────────────────────────────────────────────────────────────────
-  # React Frontend
-  # ────────────────────────────────────────────────────────────────────────────
-  frontend:
-    name: React — Type Check & Build
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: TypeScript type check
-        working-directory: frontend
-        run: npx tsc --noEmit
-
-      - name: Build production bundle
-        working-directory: frontend
-        run: npm run build
-        env:
-          CI: false
-
-      - name: Run tests
-        working-directory: frontend
-        run: npm test -- --watchAll=false --passWithNoTests
-
-  # ────────────────────────────────────────────────────────────────────────────
-  # Docker — build and smoke-test the server image
-  # ────────────────────────────────────────────────────────────────────────────
-  docker:
-    name: Docker — Build & Smoke Test
-    runs-on: ubuntu-latest
-    needs: [backend, frontend]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build Docker image
-        working-directory: backend
-        run: docker build -t collab-editor-backend:ci .
-
-      - name: Smoke test — health endpoint
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.22' }
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - run: go vet ./...
+      - run: CGO_ENABLED=0 go build ./...
+      - name: Tests (race detector, coverage)
+        run: go test -race -count=1 -coverprofile=coverage.out ./...
+      - name: Fail if a package has no tests
         run: |
-          docker run -d -p 8080:8080 --name smoke collab-editor-backend:ci
-          sleep 2
-          curl -sf http://localhost:8080/health | grep -q '"status":"ok"'
-          docker stop smoke
-          echo "✓ Health check passed"
+          for p in $(go list ./... | grep -v '^collab-editor$'); do
+            d=$(go list -f '{{.Dir}}' $p); ls $d/*_test.go >/dev/null 2>&1 || { echo "no tests in $p"; exit 1; }
+          done
+      - name: Fuzz smoke (20s)
+        run: go test -run='^$' -fuzz=FuzzApply -fuzztime=20s ./crdt
+      - run: go tool cover -func=coverage.out | tail -1
+
+  web:
+    name: Frontend — typecheck, unit, conformance (TS server), build
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Install (npm ci once package-lock.json is committed)
+        run: if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:protocol
+      - run: npm run build
+
+  integration:
+    name: Go server — conformance + browser E2E + shutdown + Docker
+    needs: [go, web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.22' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Install frontend deps + Chromium
+        working-directory: frontend
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+          npx playwright install --with-deps chromium
+      - name: Build
+        run: |
+          (cd backend && CGO_ENABLED=0 go build -o bin/collab-editor-server .)
+          (cd frontend && npm run build)
+      - name: Start fake LLM and the Go server
+        run: |
+          (cd frontend && FAKE_LLM_PORT=8299 nohup node e2e/fake-llm.mjs > /tmp/llm.log 2>&1 &)
+          PORT=8080 STATIC_DIR=frontend/dist LLM_API_KEY=e2e LLM_MODEL=fake LLM_API_URL=http://127.0.0.1:8299 AI_TIMEOUT_MS=2500 \
+            nohup backend/bin/collab-editor-server > /tmp/server.log 2>&1 & echo $! > /tmp/server.pid
+          for i in $(seq 50); do curl -sf localhost:8080/healthz && break; sleep 0.2; done
+          curl -sf localhost:8080/readyz
+      - name: Protocol conformance against Go
+        working-directory: frontend
+        run: SERVER_URL=http://127.0.0.1:8080 node tests/protocol/run.mjs
+      - name: Browser E2E against Go
+        working-directory: frontend
+        run: E2E_BASE_URL=http://127.0.0.1:8080 npx playwright test
+      - name: Graceful shutdown (SIGTERM → 1001 to clients, clean exit)
+        run: |
+          kill -TERM $(cat /tmp/server.pid)
+          for i in $(seq 50); do kill -0 $(cat /tmp/server.pid) 2>/dev/null || break; sleep 0.2; done
+          if kill -0 $(cat /tmp/server.pid) 2>/dev/null; then echo "server still running after SIGTERM"; exit 1; fi
+          grep -q shutdown_complete /tmp/server.log
+      - name: Docker image smoke test
+        run: |
+          docker build -t collab-editor:ci .
+          docker run -d -p 8081:8080 --name smoke collab-editor:ci
+          for i in $(seq 50); do curl -sf localhost:8081/healthz && break; sleep 0.2; done
+          curl -sf localhost:8081/ | grep -q '<div id="root">'
+          docker stop -t 15 smoke
+          test "$(docker inspect -f '{{.State.ExitCode}}' smoke)" = "0"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: logs-and-traces
+          path: |
+            /tmp/server.log
+            frontend/test-results

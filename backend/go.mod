@@ -1,3 +1,3 @@
-module github.com/yourusername/collab-editor
+module collab-editor
 
 go 1.22

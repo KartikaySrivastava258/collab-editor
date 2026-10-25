@@ -1,0 +1,226 @@
+
+> collab-editor-frontend@2.0.0 test:protocol
+> node tests/protocol/run.mjs
+
+protocol suite → http://127.0.0.1:41901 (TS test server)
+TAP version 13
+# Subtest: HTTP endpoints
+    # Subtest: health and readiness report ok
+    ok 1 - health and readiness report ok
+      ---
+      duration_ms: 31.437937
+      type: 'test'
+      ...
+    # Subtest: room text endpoint validates ids and 404s unknown rooms
+    ok 2 - room text endpoint validates ids and 404s unknown rooms
+      ---
+      duration_ms: 10.723903
+      type: 'test'
+      ...
+    1..2
+ok 1 - HTTP endpoints
+  ---
+  duration_ms: 43.150706
+  type: 'suite'
+  ...
+# Subtest: join and presence
+    # Subtest: welcome carries empty snapshot, limits, persistence mode, AI status
+    ok 1 - welcome carries empty snapshot, limits, persistence mode, AI status
+      ---
+      duration_ms: 24.814758
+      type: 'test'
+      ...
+    # Subtest: presence updates on join and leave
+    ok 2 - presence updates on join and leave
+      ---
+      duration_ms: 17.706972
+      type: 'test'
+      ...
+    # Subtest: a second connection with the same client id replaces the first (4001)
+    ok 3 - a second connection with the same client id replaces the first (4001)
+      ---
+      duration_ms: 17.821159
+      type: 'test'
+      ...
+    1..3
+ok 2 - join and presence
+  ---
+  duration_ms: 60.745151
+  type: 'suite'
+  ...
+# Subtest: two-client collaboration
+    # Subtest: edits from A reach B, and B edits reach A
+    ok 1 - edits from A reach B, and B edits reach A
+      ---
+      duration_ms: 20.009948
+      type: 'test'
+      ...
+    # Subtest: sender does not receive an echo of its own ops
+    ok 2 - sender does not receive an echo of its own ops
+      ---
+      duration_ms: 15.664239
+      type: 'test'
+      ...
+    # Subtest: concurrent typing at the same position converges without interleaving runs
+    ok 3 - concurrent typing at the same position converges without interleaving runs
+      ---
+      duration_ms: 20.722766
+      type: 'test'
+      ...
+    # Subtest: delete while the other client inserts nearby
+    ok 4 - delete while the other client inserts nearby
+      ---
+      duration_ms: 12.712754
+      type: 'test'
+      ...
+    1..4
+ok 3 - two-client collaboration
+  ---
+  duration_ms: 69.908163
+  type: 'suite'
+  ...
+# Subtest: convergence under load
+    # Subtest: randomized: 4 clients x 150 interleaved edits converge with the server
+    ok 1 - randomized: 4 clients x 150 interleaved edits converge with the server
+      ---
+      duration_ms: 214.453156
+      type: 'test'
+      ...
+    1..1
+ok 4 - convergence under load
+  ---
+  duration_ms: 214.64947
+  type: 'suite'
+  ...
+# Subtest: late join, reconnect, idempotency
+    # Subtest: late joiner gets full state including tombstones
+    ok 1 - late joiner gets full state including tombstones
+      ---
+      duration_ms: 7.069963
+      type: 'test'
+      ...
+    # Subtest: reconnect with offline edits merges both sides
+    ok 2 - reconnect with offline edits merges both sides
+      ---
+      duration_ms: 11.608807
+      type: 'test'
+      ...
+    # Subtest: resending an already-applied batch is idempotent
+    ok 3 - resending an already-applied batch is idempotent
+      ---
+      duration_ms: 6.354848
+      type: 'test'
+      ...
+    # Subtest: sync replays state authored by others (server-restart recovery path)
+    ok 4 - sync replays state authored by others (server-restart recovery path)
+      ---
+      duration_ms: 13.582607
+      type: 'test'
+      ...
+    # Subtest: rooms are isolated
+    ok 5 - rooms are isolated
+      ---
+      duration_ms: 113.041206
+      type: 'test'
+      ...
+    # Subtest: ping gets pong
+    ok 6 - ping gets pong
+      ---
+      duration_ms: 4.026548
+      type: 'test'
+      ...
+    1..6
+ok 5 - late join, reconnect, idempotency
+  ---
+  duration_ms: 156.309958
+  type: 'suite'
+  ...
+# Subtest: rejection of invalid input
+    # Subtest: malformed JSON
+    ok 1 - malformed JSON
+      ---
+      duration_ms: 8.122393
+      type: 'test'
+      ...
+    # Subtest: unknown message type
+    ok 2 - unknown message type
+      ---
+      duration_ms: 3.283933
+      type: 'test'
+      ...
+    # Subtest: binary frames
+    ok 3 - binary frames
+      ---
+      duration_ms: 4.066992
+      type: 'test'
+      ...
+    # Subtest: structurally invalid op (two code points)
+    ok 4 - structurally invalid op (two code points)
+      ---
+      duration_ms: 5.194618
+      type: 'test'
+      ...
+    # Subtest: insert authored by another client in an ops message
+    ok 5 - insert authored by another client in an ops message
+      ---
+      duration_ms: 3.375932
+      type: 'test'
+      ...
+    # Subtest: insert after an unknown origin
+    ok 6 - insert after an unknown origin
+      ---
+      duration_ms: 6.176865
+      type: 'test'
+      ...
+    # Subtest: delete of an unknown atom
+    ok 7 - delete of an unknown atom
+      ---
+      duration_ms: 5.84007
+      type: 'test'
+      ...
+    # Subtest: too many ops in one message
+    ok 8 - too many ops in one message
+      ---
+      duration_ms: 33.473269
+      type: 'test'
+      ...
+    # Subtest: oversized message is refused with close code 1009
+    ok 9 - oversized message is refused with close code 1009
+      ---
+      duration_ms: 6.079011
+      type: 'test'
+      ...
+    # Subtest: upgrade with invalid room id is rejected with 400
+    ok 10 - upgrade with invalid room id is rejected with 400
+      ---
+      duration_ms: 9.553691
+      type: 'test'
+      ...
+    # Subtest: upgrade from a disallowed browser origin is rejected with 403
+    ok 11 - upgrade from a disallowed browser origin is rejected with 403
+      ---
+      duration_ms: 3.079095
+      type: 'test'
+      ...
+    # Subtest: AI request when AI is disabled returns a clear error, editing unaffected
+    ok 12 - AI request when AI is disabled returns a clear error, editing unaffected
+      ---
+      duration_ms: 8.278836
+      type: 'test'
+      ...
+    1..12
+ok 6 - rejection of invalid input
+  ---
+  duration_ms: 97.314776
+  type: 'suite'
+  ...
+1..6
+# tests 28
+# suites 6
+# pass 28
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 850.973319
+exit=0

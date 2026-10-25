@@ -1,40 +1,36 @@
 {
   "name": "collab-editor-frontend",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1",
-    "typescript": "^4.9.5"
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "typecheck:core": "tsc -p tsconfig.core.json",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "test:protocol": "node tests/protocol/run.mjs",
+    "test:e2e": "playwright test",
+    "test:all": "npm run typecheck && npm test && npm run test:protocol && npm run build && npm run test:e2e",
+    "test-server": "node test-server/server.ts",
+    "gen:vectors": "node scripts/gen-crdt-vectors.ts",
+    "bench:crdt": "node ../scripts/benchmarks/crdt-bench.ts",
+    "bench:ws": "node ../scripts/benchmarks/ws-latency.ts"
   },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+  "dependencies": {
+    "react": "19.2.5",
+    "react-dom": "19.2.5"
   },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
-  },
-  "proxy": "http://localhost:8080",
   "devDependencies": {
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3"
+    "@playwright/test": "1.56.0",
+    "@types/node": "25.6.0",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "esbuild": "0.28.2",
+    "typescript": "6.0.3",
+    "ws": "8.22.0"
   }
 }
